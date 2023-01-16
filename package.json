@@ -14,11 +14,11 @@
   "author": "Aryan Sawhney",
   "license": "MIT",
   "dependencies": {
-    "@logseq/libs": "0.0.1-alpha.34"
+    "@logseq/libs": "^0.0.14"
   },
   "logseq": {
-    "id": "logseq-starter-plugin",
-    "title": "logseq-starter-plugin",
+    "id": "logseq-automatic-done",
+    "title": "logseq-automatic-done",
     "icon": "./icon.png"
   },
   "devDependencies": {

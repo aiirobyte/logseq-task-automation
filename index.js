@@ -9,7 +9,6 @@ async function insertSomeBlocks (e) {
   logseq.Editor.insertBlock(e.uuid, `This is block ${numberArray[number]}`, {sibling: true})}
 
   }
-  
 
 const main = async () => {
   console.log('plugin loaded');
