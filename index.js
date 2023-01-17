@@ -10,7 +10,7 @@ import '@logseq/libs';
 
 //   }
 
-//TODO get parent blocks and child block todo status
+//TODO get current parent blocks and child blocks status
 //getBlockProperties
 async function getWorkTree (currentBlockUuid) {
   return;
