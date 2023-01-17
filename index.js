@@ -1,26 +1,18 @@
 import '@logseq/libs';
 
-//Inputs 5 numbered blocks when called
-// async function insertSomeBlocks (e) {
-//   console.log('Open the calendar!')
-//   let numberArray = [1, 2, 3, 4, 5]
-//   for (const number in numberArray){
-//   logseq.App.showMsg("Function has been run")
-//   logseq.Editor.insertBlock(e.uuid, `This is block ${numberArray[number]}`, {sibling: true})}
-
-//   }
 
 //TODO get current parent blocks and child blocks status
 //getBlockProperties
 async function getWorkTree (currentBlockUuid) {
-  return;
+   
+  return workTree;
 }
 
 //TODO specify conditions
 //TODO update status method
-async function updateStatus (currentBlockUuid,status) {
-  const block = await logseq.Editor.getBlock(currentBlockUuid);
-  const workTree = await getWorkTree(currentBlockUuid);
+async function updateStatus (block,status) {
+  const blockUuid = block.uuid;
+  const workTree = await getWorkTree(blockUuid);
   if (block.marker === status.todo) {
     console.log(`Get block marker: ${block.marker}`);
     let blockContent = block.content.slice(block.content.indexOf(' '));
@@ -44,9 +36,17 @@ const main = async () => {
 
   logseq.DB.onChanged(async () => {
     const block = await logseq.Editor.getCurrentBlock();
-    let currentBlockUuid = block.uuid;
+    const currentBlockUuid = block.uuid;
 
-    updateStatus(currentBlockUuid,status);
+    //Only listen changes on the block which has a todo or doing marker
+    if (block?.marker === status.todo || block?.marker === status.doing) {
+      logseq.DB.onBlockChanged(currentBlockUuid, ({block,txData}) => {
+        //Using txData for triggering block marker changed to done
+        if (txData[10][2] === status.done){
+          updateStatus(block,status);
+        }
+      });
+    }
   });
 };
 
