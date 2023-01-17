@@ -1,7 +1,7 @@
 {
-  "name": "logseq-starter-plugin",
+  "name": "logseq-automatic-done",
   "version": "1.0",
-  "description": "Starter Plugin",
+  "description": "A simple plugin for smooth task workflow.",
   "main": "dist/index.html",
   "targets": {
     "main": false
@@ -11,7 +11,7 @@
     "build": "parcel build --no-source-maps index.html --public-url ./"
   },
   "keywords": [],
-  "author": "Aryan Sawhney",
+  "author": "aiirobyte",
   "license": "MIT",
   "dependencies": {
     "@logseq/libs": "^0.0.14"
