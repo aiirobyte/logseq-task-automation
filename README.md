@@ -1,2 +1,2 @@
-# logseq-plugin-starter-template
-A quick and easy to use template to get you going from the get go
+# logseq-automatic-done
+A simple Logseq plugin which can automatically start or finish todo tasks.
