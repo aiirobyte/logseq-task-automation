@@ -1,8 +1,13 @@
 {
   "name": "logseq-task-automation",
-  "version": "0.0.1",
+  "version": "v0.0.1",
   "title": "Task Automation",
-  "description": "A Logseq plugin that can help you to begin or finish task easily.",
+  "description": "A plugin that simplifies the process of initiating and completing tasks on Logseq.",
+  "logseq": {
+    "title": "Task Automation",
+    "icon": "./icon.png",
+    "id": "logseq-task-automation"
+  },
   "main": "dist/index.html",
   "targets": {
     "main": false
@@ -17,11 +22,6 @@
   },
   "dependencies": {
     "@logseq/libs": "^0.0.14"
-  },
-  "logseq": {
-    "id": "logseq-task-automation",
-    "title": "logseq-automatic-done",
-    "icon": "./icon.png"
   },
   "devDependencies": {
     "parcel": "^2.0.0"
