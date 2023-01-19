@@ -1,23 +1,25 @@
 {
-  "name": "logseq-automatic-done",
-  "version": "1.0",
-  "description": "A simple plugin for smooth task workflow.",
+  "name": "logseq-task-automation",
+  "version": "0.0.1",
+  "title": "Task Automation",
+  "description": "A Logseq plugin that can help you to begin or finish task easily.",
   "main": "dist/index.html",
   "targets": {
     "main": false
   },
+  "default": "dist/index.html",
+  "repo": "aiirobyte/logseq-task-automation",
+  "author": "aiirobyte",
+  "license": "MIT",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "parcel build --no-source-maps index.html --public-url ./"
   },
-  "keywords": [],
-  "author": "aiirobyte",
-  "license": "MIT",
   "dependencies": {
     "@logseq/libs": "^0.0.14"
   },
   "logseq": {
-    "id": "logseq-automatic-done",
+    "id": "logseq-task-automation",
     "title": "logseq-automatic-done",
     "icon": "./icon.png"
   },
