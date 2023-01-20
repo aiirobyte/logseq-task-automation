@@ -41,7 +41,7 @@ async function getTaskMap(block) {
 
   // Add parent with marker
   const parentBlock = await logseq.Editor.getBlock(block.parent.id);
-  parentBlock?.marker
+  parentBlock && parentBlock?.marker
     ? taskMap.parent = {
       id: parentBlock.id,
       uuid: parentBlock.uuid,
@@ -52,24 +52,28 @@ async function getTaskMap(block) {
 
   // Add all siblings with marker
   let previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(blockUuid);
-  while (previousSiblingBlock && previousSiblingBlock?.marker) {
-    taskMap.siblings.unshift({
-      id: previousSiblingBlock.id,
-      uuid: previousSiblingBlock.uuid,
-      marker: previousSiblingBlock.marker.toLowerCase(),
-      content: previousSiblingBlock.content,
-    });
-    previousSiblingBlock = logseq.Editor.getPreviousSiblingBlock(previousSiblingBlock.uuid);
+  while (previousSiblingBlock) {
+    previousSiblingBlock?.marker
+      ? taskMap.siblings.unshift({
+        id: previousSiblingBlock.id,
+        uuid: previousSiblingBlock.uuid,
+        marker: previousSiblingBlock.marker.toLowerCase(),
+        content: previousSiblingBlock.content,
+      })
+      : null;
+    previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(previousSiblingBlock.uuid);
   }
   let nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(blockUuid);
-  while (nextSiblingBlock && nextSiblingBlock?.marker) {
-    taskMap.siblings.push({
-      id: nextSiblingBlock.id,
-      uuid: nextSiblingBlock.uuid,
-      marker: nextSiblingBlock.marker.toLowerCase(),
-      content: nextSiblingBlock.content,
-    });
-    nextSiblingBlock = logseq.Editor.getNextSiblingBlock(nextSiblingBlock.uuid);
+  while (nextSiblingBlock) {
+    nextSiblingBlock?.marker
+      ? taskMap.siblings.push({
+        id: nextSiblingBlock.id,
+        uuid: nextSiblingBlock.uuid,
+        marker: nextSiblingBlock.marker.toLowerCase(),
+        content: nextSiblingBlock.content,
+      })
+      : null;
+    nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(nextSiblingBlock.uuid);
   }
 
   return taskMap;
@@ -85,65 +89,62 @@ async function taskUpdate(uuid, markerChangedTo) {
   const taskMap = await getTaskMap(currentBlock);
 
   const isSiblingsHaveNow = taskMap.siblings.find((task) => task.marker === Markers.now);
-  const isSiblingsAllDone = taskMap.siblings !== []
-    ? taskMap.siblings.every((task) => task.marker === Markers.done)
-    : true;
+  const isSiblingsAllDone = taskMap.siblings.every((task) => task.marker === Markers.done);
+
+  const updateMarker = async (block, targetMarker, { srcMarker, preventMarker } = {}) => {
+    if (block) {
+      const updateBlock = async () => {
+        const content = block.content.slice(block.content.indexOf(' '));
+        const marker = targetMarker.toUpperCase();
+        await logseq.Editor.updateBlock(block.uuid, marker + content);
+        taskUpdate(block.uuid);
+      };
+      if (block.marker !== targetMarker) {
+        // If target marker is not current block marker, then run into next step.
+        if (block.marker !== preventMarker && preventMarker !== null) {
+          // If block marker is not the marker prevented from and has been defined, update block.
+          updateBlock();
+        } else if (block.marker === srcMarker) {
+          // If block marker is the ideal source marker, then update block.
+          updateBlock();
+        } else if (!(srcMarker && preventMarker)) {
+          // If all source marker and preventMarker all not defined, just update block.
+          updateBlock();
+        }
+      }
+    }
+  };
 
   switch (markerChangedTo) {
     case Markers.later:
-      // Change parent and children marker from now to later
-      if (taskMap.parent.marker === Markers.now) {
-        // If at least one sibling which has a now marker, do not change parent marker
-        if (!isSiblingsHaveNow) {
-          const content = taskMap.parent.content.slice(taskMap.parent.content.indexOf(' '));
-          const markerContent = Markers.later.toUpperCase();
-          logseq.Editor.updateBlock(taskMap.parent.uuid, markerContent + content);
-        }
+      // If at least one sibling which has a now marker do not change parent marker,
+      // otherwise change parent marker to later.
+      if (!isSiblingsHaveNow) {
+        updateMarker(taskMap.parent, Markers.later, { srcMarker: Markers.now });
       }
       // All children's now marker changed to later
       taskMap.children.forEach((childBlock) => {
-        childBlock.marker === Markers.now
-          ? logseq.Editor.updateBlock(childBlock.uuid, Markers.later.toUpperCase() + childBlock.content.slice(childBlock.content.indexOf(' ')))
-          : null;
+        updateMarker(childBlock, Markers.later, { srcMarker: Markers.now });
       });
       break;
     case Markers.now:
       // Change parent marker to now
-      taskMap.parent.marker === Markers.later
-        ? logseq.Editor.updateBlock(taskMap.parent.uuid, Markers.now.toUpperCase() + taskMap.parent.content.slice(taskMap.parent.content.indexOf(' ')))
-        : null;
+      updateMarker(taskMap.parent, Markers.now);
       break;
     case Markers.done:
       if (isSiblingsAllDone) {
-        console.log('siblings all are done');
-        console.log(taskMap.siblings);
-        // When parent marker is not done, then if all siblings are done set parent marker to done
-        if (taskMap.parent.marker !== Markers.done) {
-          console.log('parent is not done');
-          const content = taskMap.parent.content.slice(taskMap.parent.content.indexOf(' '));
-          const markerContent = Markers.done.toUpperCase();
-          logseq.Editor.updateBlock(taskMap.parent.uuid, markerContent + content);
-        }
+        updateMarker(taskMap.parent, Markers.done);
       } else if (!isSiblingsHaveNow) {
-        // When parent marker is now,
-        // then if at least one sibling has a now marker, do not change parent marker
-        if (taskMap.parent.marker === Markers.now) {
-          const content = taskMap.parent.content.slice(taskMap.parent.content.indexOf(' '));
-          const markerContent = Markers.later.toUpperCase();
-          logseq.Editor.updateBlock(taskMap.parent.uuid, markerContent + content);
-        }
+        updateMarker(taskMap.parent, Markers.later, { srcMarker: Markers.now });
       }
-      // Change all child block to done
       taskMap.children.forEach((childBlock) => {
-        childBlock.marker !== Markers.done
-          ? logseq.Editor.updateBlock(childBlock.uuid, Markers.done.toUpperCase() + childBlock.content.slice(childBlock.content.indexOf(' ')))
-          : null;
+        updateMarker(childBlock, Markers.done);
       });
   }
 }
 
 const main = async () => {
-  console.log('Init automatic done service.');
+  console.log('Init task automation service.');
   const mainContainer = parent.document.querySelector('#main-content-container');
   Markers = await preferredMarkers();
 
