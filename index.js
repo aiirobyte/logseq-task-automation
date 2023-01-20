@@ -97,17 +97,17 @@ async function taskUpdate(uuid, markerChangedTo) {
         const content = block.content.slice(block.content.indexOf(' '));
         const marker = targetMarker.toUpperCase();
         await logseq.Editor.updateBlock(block.uuid, marker + content);
-        taskUpdate(block.uuid);
+        taskUpdate(block.uuid, targetMarker);
       };
       if (block.marker !== targetMarker) {
         // If target marker is not current block marker, then run into next step.
-        if (block.marker !== preventMarker && preventMarker !== null) {
+        if (block.marker !== preventMarker && preventMarker !== undefined) {
           // If block marker is not the marker prevented from and has been defined, update block.
           updateBlock();
         } else if (block.marker === srcMarker) {
           // If block marker is the ideal source marker, then update block.
           updateBlock();
-        } else if (!(srcMarker && preventMarker)) {
+        } else if ((srcMarker === undefined && preventMarker == undefined)) {
           // If all source marker and preventMarker all not defined, just update block.
           updateBlock();
         }
