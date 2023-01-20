@@ -29,50 +29,42 @@ async function getTaskMap(block) {
 
   // Add all children with marker
   blockWithChildren.children?.forEach((childBlock) => {
-    childBlock?.marker
-      ? taskMap.children.push({
-        id: childBlock.id,
-        uuid: childBlock.uuid,
-        marker: childBlock.marker.toLowerCase(),
-        content: childBlock.content,
-      })
-      : null;
+    childBlock?.marker && taskMap.children.push({
+      id: childBlock.id,
+      uuid: childBlock.uuid,
+      marker: childBlock.marker.toLowerCase(),
+      content: childBlock.content,
+    });
   });
 
   // Add parent with marker
   const parentBlock = await logseq.Editor.getBlock(block.parent.id);
-  parentBlock && parentBlock?.marker
-    ? taskMap.parent = {
-      id: parentBlock.id,
-      uuid: parentBlock.uuid,
-      marker: parentBlock.marker.toLowerCase(),
-      content: parentBlock.content,
-    }
-    : null;
+  parentBlock?.marker && (taskMap.parent = {
+    id: parentBlock.id,
+    uuid: parentBlock.uuid,
+    marker: parentBlock.marker.toLowerCase(),
+    content: parentBlock.content,
+  });
 
   // Add all siblings with marker
   let previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(blockUuid);
   while (previousSiblingBlock) {
-    previousSiblingBlock?.marker
-      ? taskMap.siblings.unshift({
-        id: previousSiblingBlock.id,
-        uuid: previousSiblingBlock.uuid,
-        marker: previousSiblingBlock.marker.toLowerCase(),
-        content: previousSiblingBlock.content,
-      })
-      : null;
+    previousSiblingBlock?.marker && taskMap.siblings.unshift({
+      id: previousSiblingBlock.id,
+      uuid: previousSiblingBlock.uuid,
+      marker: previousSiblingBlock.marker.toLowerCase(),
+      content: previousSiblingBlock.content,
+    });
     previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(previousSiblingBlock.uuid);
   }
   let nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(blockUuid);
   while (nextSiblingBlock) {
-    nextSiblingBlock?.marker
-      ? taskMap.siblings.push({
-        id: nextSiblingBlock.id,
-        uuid: nextSiblingBlock.uuid,
-        marker: nextSiblingBlock.marker.toLowerCase(),
-        content: nextSiblingBlock.content,
-      })
-      : null;
+    nextSiblingBlock?.marker && taskMap.siblings.push({
+      id: nextSiblingBlock.id,
+      uuid: nextSiblingBlock.uuid,
+      marker: nextSiblingBlock.marker.toLowerCase(),
+      content: nextSiblingBlock.content,
+    });
     nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(nextSiblingBlock.uuid);
   }
 
@@ -107,7 +99,7 @@ async function taskUpdate(uuid, markerChangedTo) {
         } else if (block.marker === srcMarker) {
           // If block marker is the ideal source marker, then update block.
           updateBlock();
-        } else if ((srcMarker === undefined && preventMarker == undefined)) {
+        } else if ((srcMarker === undefined && preventMarker === undefined)) {
           // If all source marker and preventMarker all not defined, just update block.
           updateBlock();
         }
@@ -140,6 +132,8 @@ async function taskUpdate(uuid, markerChangedTo) {
       taskMap.children.forEach((childBlock) => {
         updateMarker(childBlock, Markers.done);
       });
+      break;
+    default:
   }
 }
 
