@@ -143,20 +143,26 @@ const main = async () => {
   Markers = await preferredMarkers();
 
   // Use click on mainContentContainer as listener
+  //TODO add 'mod+enter' keydown as listener
   function addListenerToTask() {
+    //click event listener for inline marker
     mainContainer.addEventListener('click', async (e) => {
-      const targetBlockUuid = e.path[4]?.getAttribute('blockid');
       const targetElement = e.target;
+      const targetParentClassName = e.path[1].className;
+      const targetBlockUuid = e.path[4]?.getAttribute('blockid');
+      console.log(targetParentClassName);
 
       if (targetBlockUuid) {
-        if (targetElement.tagName === 'A') {
-          targetElement.classList.contains(`${Markers.later.toUpperCase()}`)
-            ? taskUpdate(targetBlockUuid, Markers.later)
-            : taskUpdate(targetBlockUuid, Markers.now);
-        } else {
-          targetElement.classList.contains('checked')
-            ? taskUpdate(targetBlockUuid, Markers.later)
-            : taskUpdate(targetBlockUuid, Markers.done);
+        for (const key in Markers) {
+          if (targetParentClassName === `inline ${Markers[key]}`) {
+            if (targetElement.tagName === 'A') {
+              taskUpdate(targetBlockUuid, Markers[key]);
+            } else if (targetParentClassName !== `inline ${Markers.done}`) {
+              taskUpdate(targetBlockUuid, Markers.done);
+            } else {
+              taskUpdate(targetBlockUuid, Markers.later);
+            }
+          }
         }
       }
     });
