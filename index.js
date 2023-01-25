@@ -152,7 +152,13 @@ async function updateTaskMap(uuid, markerChangedTo) {
       updateMarker(taskMap.parent, Markers.now);
       break;
     case Markers.done:
-      if (taskMap.nextSibling && taskMap.parent) {
+      if (
+        !(
+          taskMap.nextSibling === null ||
+          taskMap.nextSibling?.marker === Markers.done
+        ) &&
+        taskMap.parent
+      ) {
         // If next sibling and parent both have marker, then change nextSibling marker to now
         await updateMarker(taskMap.nextSibling, Markers.now);
       } else {
