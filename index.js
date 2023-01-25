@@ -175,6 +175,7 @@ async function updateTaskMap(uuid, markerChangedTo) {
       });
       break;
     default:
+      return;
   }
 }
 
@@ -185,11 +186,9 @@ const main = async () => {
   );
   Markers = await preferredMarkers();
 
-  // Use click on mainContentContainer as listener
-  //TODO add 'mod+enter' keydown as listener
   function addListenerToTask() {
-    //click event listener for inline marker
-    mainContainer.addEventListener("click", async (e) => {
+    // click event listener for inline marker
+    mainContainer.addEventListener("click", (e) => {
       const targetElement = e.target;
       const targetParentClassName = e.path[1].className;
       const targetBlockUuid = e.path[4]?.getAttribute("blockid");
@@ -210,6 +209,17 @@ const main = async () => {
             }
           }
         }
+      }
+    });
+    // listen ctrl + enter keyup event
+    mainContainer.addEventListener("keyup", async (e) => {
+      if (e.ctrlKey && e.code === "Enter") {
+        const block = await logseq.Editor.getCurrentBlock();
+        const markerList = [Markers.later, Markers.now, Markers.done];
+        const markerChangedTo =
+          markerList[markerList.indexOf(block?.marker?.toLowerCase()) + 1];
+
+        updateTaskMap(block.uuid, markerChangedTo);
       }
     });
   }
