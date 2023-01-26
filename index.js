@@ -219,7 +219,6 @@ const main = async () => {
       logseq.settings.keybinding === config.cycleShortcutsSet
         ? false
         : logseq.settings.keybinding;
-    console.log(CycleKeybinding);
   };
 
   function addListenerToTask(startup = true) {
