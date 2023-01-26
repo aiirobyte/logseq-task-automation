@@ -2,18 +2,35 @@ import '@logseq/libs';
 
 let Markers;
 
-const preferredMarkers = async () => {
+const configs = async () => {
   const { preferredWorkflow } = await logseq.App.getUserConfigs();
-  return preferredWorkflow === 'now'
-    ? { later: 'later', now: 'now', done: 'done' }
-    : { later: 'todo', now: 'doing', done: 'done' };
+  const { shortcuts } = await logseq.App.getCurrentGraphConfigs();
+
+  const config = {
+    preferredMarkers: { later: "later", now: "now", done: "done" },
+    cycleShortcutsSet: false,
+  };
+
+  if (preferredWorkflow === "todo") {
+    config.preferredMarkers = { later: "todo", now: "doing", done: "done" };
+  }
+
+  if (
+    shortcuts?.cycleTodo ||
+    shortcuts.cycleTodo === "ctrl+enter" ||
+    shortcuts.cycleTodo === "mod+enter"
+  ) {
+    config.cycleShortcutsSet = true;
+  }
+
+  return config;
 };
 
 /**
  * Get current block task map.
  * @param {string} block - The current clicked block
  * @return {object} taskMap
-*/
+ */
 async function getTaskMap(block) {
   // TODO get reference task status
   const taskMap = {
@@ -181,10 +198,11 @@ async function updateTaskMap(uuid, markerChangedTo) {
 
 const main = async () => {
   console.log("Init task automation service.");
-  const mainContainer = parent.document.querySelector(
-    "#main-content-container"
-  );
-  Markers = await preferredMarkers();
+  const mainContainer = top.document.querySelector("#main-content-container");
+  const config = await configs();
+
+  let cycleBindingSet = config.cycleShortcutsSet;
+  Markers = config.preferredMarkers;
 
   function addListenerToTask() {
     // click event listener for inline marker
@@ -211,17 +229,40 @@ const main = async () => {
         }
       }
     });
-    // listen ctrl + enter keyup event
-    mainContainer.addEventListener("keyup", async (e) => {
-      if (e.ctrlKey && e.code === "Enter") {
-        const block = await logseq.Editor.getCurrentBlock();
-        const markerList = [Markers.later, Markers.now, Markers.done];
-        const markerChangedTo =
-          markerList[markerList.indexOf(block?.marker?.toLowerCase()) + 1];
+    // listen cycle-todo shortcuts if set it to false
+    if (!cycleBindingSet) {
+      logseq.App.registerCommandPalette(
+        {
+          key: "change-marker",
+          label: "cycle-marker",
+          keybinding: {
+            mode: "global",
+            binding: "mod+enter",
+          },
+        },
+        async () => {
+          const block = await logseq.Editor.getCurrentBlock();
+          const markerList = [Markers.later, Markers.now, Markers.done];
+          const markerChangedTo =
+            markerList[markerList.indexOf(block?.marker?.toLowerCase()) + 1];
 
-        updateTaskMap(block.uuid, markerChangedTo);
-      }
-    });
+          await logseq.App.invokeExternalCommand("logseq.editor/cycle-todo");
+          updateTaskMap(block.uuid, markerChangedTo);
+        }
+      );
+    } else {
+      // listen ctrl + enter keyup event on textarea
+      mainContainer.addEventListener("keyup", async (e) => {
+        if (e.ctrlKey && e.code === "Enter") {
+          const block = await logseq.Editor.getCurrentBlock();
+          const markerList = [Markers.later, Markers.now, Markers.done];
+          const markerChangedTo =
+            markerList[markerList.indexOf(block?.marker?.toLowerCase()) + 1];
+
+          updateTaskMap(block.uuid, markerChangedTo);
+        }
+      });
+    }
   }
 
   // Start listener on startup then on routeChanged restart listener
