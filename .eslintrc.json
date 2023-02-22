@@ -17,7 +17,9 @@
       }
     ],
     "no-await-in-loop": "off",
-    "no-restricted-globals": [1, "parent"]
+    "no-restricted-globals": [1, "parent"],
+    "linebreak-style": ["error", "windows"],
+    "quotes": ["error", "double"]
   },
   "globals": {
     "logseq": "readonly"

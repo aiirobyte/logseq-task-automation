@@ -1,4 +1,5 @@
-import '@logseq/libs';
+/* eslint-disable no-unused-expressions */
+import "@logseq/libs";
 
 let Markers;
 let CycleKeybinding;
@@ -60,8 +61,8 @@ async function getTaskMap(block) {
 
   // Add all children with marker
   blockWithChildren.children?.forEach((childBlock) => {
-    childBlock?.marker &&
-      taskMap.children.push({
+    childBlock?.marker
+      && taskMap.children.push({
         id: childBlock.id,
         uuid: childBlock.uuid,
         marker: childBlock.marker.toLowerCase(),
@@ -71,8 +72,8 @@ async function getTaskMap(block) {
 
   // Add parent with marker
   const parentBlock = await logseq.Editor.getBlock(block.parent.id);
-  parentBlock?.marker &&
-    (taskMap.parent = {
+  parentBlock?.marker
+    && (taskMap.parent = {
       id: parentBlock.id,
       uuid: parentBlock.uuid,
       marker: parentBlock.marker.toLowerCase(),
@@ -81,38 +82,38 @@ async function getTaskMap(block) {
 
   // Add all siblings with marker
   let previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(
-    blockUuid
+    blockUuid,
   );
   while (previousSiblingBlock) {
-    previousSiblingBlock?.marker &&
-      taskMap.siblings.unshift({
+    previousSiblingBlock?.marker
+      && taskMap.siblings.unshift({
         id: previousSiblingBlock.id,
         uuid: previousSiblingBlock.uuid,
         marker: previousSiblingBlock.marker.toLowerCase(),
         content: previousSiblingBlock.content,
       });
     previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(
-      previousSiblingBlock.uuid
+      previousSiblingBlock.uuid,
     );
   }
   let nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(blockUuid);
-  nextSiblingBlock?.marker &&
-    (taskMap.nextSibling = {
+  nextSiblingBlock?.marker
+    && (taskMap.nextSibling = {
       id: nextSiblingBlock.id,
       uuid: nextSiblingBlock.uuid,
       marker: nextSiblingBlock.marker.toLowerCase(),
       content: nextSiblingBlock.content,
     });
   while (nextSiblingBlock) {
-    nextSiblingBlock?.marker &&
-      taskMap.siblings.push({
+    nextSiblingBlock?.marker
+      && taskMap.siblings.push({
         id: nextSiblingBlock.id,
         uuid: nextSiblingBlock.uuid,
         marker: nextSiblingBlock.marker.toLowerCase(),
         content: nextSiblingBlock.content,
       });
     nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(
-      nextSiblingBlock.uuid
+      nextSiblingBlock.uuid,
     );
   }
 
@@ -129,16 +130,16 @@ async function updateTaskMap(uuid, markerChangedTo) {
   const taskMap = await getTaskMap(currentBlock);
 
   const isSiblingsHaveNow = taskMap.siblings.find(
-    (task) => task.marker === Markers.now
+    (task) => task.marker === Markers.now,
   );
   const isSiblingsAllDone = taskMap.siblings.every(
-    (task) => task.marker === Markers.done
+    (task) => task.marker === Markers.done,
   );
 
   const updateMarker = async (
     block,
     targetMarker,
-    { srcMarker, preventMarker } = {}
+    { srcMarker, preventMarker } = {},
   ) => {
     if (block) {
       const updateBlock = async () => {
@@ -182,32 +183,30 @@ async function updateTaskMap(uuid, markerChangedTo) {
     case Markers.done:
       if (
         !(
-          taskMap.nextSibling === null ||
-          taskMap.nextSibling?.marker === Markers.done
-        ) &&
-        taskMap.parent
+          taskMap.nextSibling === null
+          || taskMap.nextSibling?.marker === Markers.done
+        )
+        && taskMap.parent
       ) {
         // If next sibling and parent both have marker, then change nextSibling marker to now
         await updateMarker(taskMap.nextSibling, Markers.now);
-      } else {
-        if (isSiblingsAllDone) {
-          updateMarker(taskMap.parent, Markers.done);
-        } else if (!isSiblingsHaveNow) {
-          updateMarker(taskMap.parent, Markers.later, {
-            srcMarker: Markers.now,
-          });
-        }
+      } else if (isSiblingsAllDone) {
+        updateMarker(taskMap.parent, Markers.done);
+      } else if (!isSiblingsHaveNow) {
+        updateMarker(taskMap.parent, Markers.later, {
+          srcMarker: Markers.now,
+        });
       }
       taskMap.children.forEach((childBlock) => {
         updateMarker(childBlock, Markers.done);
       });
       break;
     default:
-      return;
   }
 }
 
 const main = async () => {
+  // eslint-disable-next-line no-console
   console.log("Init task automation service.");
   const mainContainer = top.document.querySelector("#main-content-container");
 
@@ -215,10 +214,9 @@ const main = async () => {
     const config = await configs();
 
     Markers = config.preferredMarkers;
-    CycleKeybinding =
-      logseq.settings.keybinding === config.cycleShortcutsSet
-        ? false
-        : logseq.settings.keybinding;
+    CycleKeybinding = logseq.settings.keybinding === config.cycleShortcutsSet
+      ? false
+      : logseq.settings.keybinding;
   };
 
   function addListenerToTask(startup = true) {
@@ -229,21 +227,24 @@ const main = async () => {
       const targetBlockUuid = e.path[4]?.getAttribute("blockid");
 
       if (targetBlockUuid) {
-        for (const key in Markers) {
+        Object.keys(Markers).forEach((key) => {
           if (targetParentClassName === `inline ${Markers[key]}`) {
             if (targetElement.tagName === "A") {
-              // Later and now target elements have "a" tag name, and the changes match their parent class name
+              // Later and now target elements have "a" tag name
+              // The changes match their parent class name
               updateTaskMap(targetBlockUuid, Markers[key]);
             } else if (targetParentClassName !== `inline ${Markers.done}`) {
-              // Done click box has another tag name, and the changes don't match their parent class name
+              // Done click box has another tag name
+              // The changes don't match their parent class name
               // The class name can be later or now
               updateTaskMap(targetBlockUuid, Markers.done);
             } else {
-              // When class name is not inline done, this means user clicks the checkbox and set marker to later
+              // When class name is not inline done,
+              // this means user clicks the checkbox and set marker to later
               updateTaskMap(targetBlockUuid, Markers.later);
             }
           }
-        }
+        });
       }
     });
     // listen cycle-todo shortcuts if set it to false
@@ -261,12 +262,13 @@ const main = async () => {
           async () => {
             const block = await logseq.Editor.getCurrentBlock();
             const markerList = [Markers.later, Markers.now, Markers.done];
-            const markerChangedTo =
-              markerList[markerList.indexOf(block?.marker?.toLowerCase()) + 1];
+            const markerChangedTo = markerList[
+              markerList.indexOf(block?.marker?.toLowerCase()) + 1
+            ];
 
             await logseq.App.invokeExternalCommand("logseq.editor/cycle-todo");
             updateTaskMap(block.uuid, markerChangedTo);
-          }
+          },
         );
       }
     } else {
@@ -275,8 +277,7 @@ const main = async () => {
         if (e.ctrlKey && e.code === "Enter") {
           const block = await logseq.Editor.getCurrentBlock();
           const markerList = [Markers.later, Markers.now, Markers.done];
-          const markerChangedTo =
-            markerList[markerList.indexOf(block?.marker?.toLowerCase()) + 1];
+          const markerChangedTo = markerList[markerList.indexOf(block?.marker?.toLowerCase()) + 1];
 
           updateTaskMap(block.uuid, markerChangedTo);
         }
@@ -298,4 +299,5 @@ const main = async () => {
   });
 };
 
+// eslint-disable-next-line no-console
 logseq.ready(main).catch(console.error);
