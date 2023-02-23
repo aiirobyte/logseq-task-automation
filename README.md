@@ -1,7 +1,8 @@
 # Task Automation
 A simple Logseq plugin which can automatically start or finish todo tasks.
 
->NOTICE: Triggering automation on focus state needs to change Logseq's cycle-todo shortcut or this plugin's shortcut setting, suggest change Logseq shortcut to `false` because this plugin provides this basic function. Otherwise, if you just want this plugin be an alternative to Logseq's cycle-todo function, you can just set plugin's shortcut different from Logseq.
+Now support automation on click and shortcut. Default shortcut for normal sequence status cycle(non task -> later -> now -> done) is `mod+shift+enter`, provide reverse cycle(non task -> done -> now -> later) too, which default shortcut is `mod+alt+shift+enter`.
+
 ## DEMO
 Click: ![click_demo](https://user-images.githubusercontent.com/73283555/214839536-516c5ca4-46f6-4907-8000-cfe75ed90d4f.gif)
 
