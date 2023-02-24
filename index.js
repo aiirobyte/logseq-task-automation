@@ -36,10 +36,9 @@ const SETTINGS_SCHEMA = [
 ];
 
 let MARKERS;
-const CYCLE_KEYBINDINGS = {};
+const KEYBINDINGS = {};
 
-let autoStarter = true;
-let timestampKeybinding = "mod+t";
+let autoStartEnabled = true;
 
 async function updateConfig(newSettings) {
   const { preferredWorkflow } = await logseq.App.getUserConfigs();
@@ -49,11 +48,11 @@ async function updateConfig(newSettings) {
     MARKERS = { later: "later", now: "now", done: "done" };
   }
 
-  CYCLE_KEYBINDINGS.ToNext = newSettings["to-next-keybinding"];
-  CYCLE_KEYBINDINGS.ToPrev = newSettings["to-prev-keybinding"];
+  KEYBINDINGS.toNext = newSettings["to-next-keybinding"];
+  KEYBINDINGS.toPrev = newSettings["to-prev-keybinding"];
+  KEYBINDINGS.AddTimestamp = newSettings["timestamp-keybinding"];
 
-  timestampKeybinding = newSettings["timestamp-keybinding"];
-  autoStarter = newSettings["auto-starter-enabled"];
+  autoStartEnabled = newSettings["auto-starter-enabled"];
 }
 
 /**
@@ -253,7 +252,7 @@ const main = async () => {
         label: "Cycle in normal sequence",
         keybinding: {
           mode: "global",
-          binding: CYCLE_KEYBINDINGS.ToNext,
+          binding: KEYBINDINGS.toNext,
         },
       },
       async () => {
@@ -287,7 +286,7 @@ const main = async () => {
         label: "Cycle in reverse sequence",
         keybinding: {
           mode: "global",
-          binding: CYCLE_KEYBINDINGS.ToPrev,
+          binding: KEYBINDINGS.toPrev,
         },
       },
       async () => {
@@ -350,22 +349,45 @@ const main = async () => {
 
   // task start function triggered by editing child block or using timestamp
   function taskStarter() {
+    const autoStart = async (block) => {
+      const blockParent = await logseq.Editor.getBlock(block?.parent?.id);
+      if (blockParent?.marker?.toLowerCase() === MARKERS.later) {
+        // only automatically start when parent task status is later and
+        // current editing block has no status, as may cause conflict when updating task map.
+        block?.marker === undefined && await updateTaskMap(blockParent.uuid, MARKERS.now);
+      }
+    };
+
     // Add auto task starter listener, if user enables it.
-    if (autoStarter) {
+    if (autoStartEnabled) {
       logseq.DB.onChanged((e) => {
         const changedBlocks = e.blocks;
         changedBlocks.forEach(async (block) => {
-          const blockParent = await logseq.Editor.getBlock(block?.parent?.id);
-          if (blockParent?.marker?.toLowerCase() === MARKERS.later) {
-            // only automatically start when parent task status is later and
-            // current editing block has no status, as may cause conflict when updating task map.
-            block?.marker === undefined && await updateTaskMap(blockParent.uuid, MARKERS.now);
-          }
+          autoStart(block);
         });
       });
     }
 
     // timestamp shortcut register
+    logseq.App.registerCommandPalette(
+      {
+        key: "task-automation-shortcuts-add-timestamp",
+        label: "Add timestamp to block",
+        keybinding: {
+          mode: "global",
+          binding: KEYBINDINGS.AddTimestamp,
+        },
+      },
+      async () => {
+        // get time
+        const today = new Date();
+        const time = `${String(today.getHours()).padStart(2, "0")}:${String(today.getMinutes()).padStart(2, "0")}`;
+
+        const block = await logseq.Editor.getCurrentBlock();
+        await logseq.Editor.updateBlock(block.uuid, `${time} ${block.content}`);
+        autoStartEnabled !== false && autoStart(block);
+      },
+    );
   }
 
   // Start functions
