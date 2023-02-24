@@ -14,7 +14,7 @@ const SETTINGS_SCHEMA = [
     key: "to-prev-keybinding",
     title: "Previous Status Cycle Shortcut",
     description:
-    "Cycle among non-task, later, now, done. This keybinding is reverse sequence.",
+    "Cycle among non-task, done, now, later. This keybinding is reverse sequence.",
     type: "string",
     default: "mod+shift+alt+enter",
   },
@@ -22,7 +22,7 @@ const SETTINGS_SCHEMA = [
     key: "auto-starter-enabled",
     title: "Auto Task Starter",
     type: "boolean",
-    description: "Enable auto task starter",
+    description: "Enable auto parent task starter when editing child block.",
     default: true,
   },
   {
@@ -152,7 +152,7 @@ async function updateTaskMap(uuid, markerChangedTo) {
   const currentBlock = await logseq.Editor.getBlock(uuid);
   const taskMap = await getTaskMap(currentBlock);
 
-  const allNowSibings = taskMap.siblings.filter(
+  const allNowSiblings = taskMap.siblings.filter(
     (task) => task.marker === MARKERS.now,
   );
   const isSiblingsAllDone = taskMap.siblings.every(
@@ -201,7 +201,7 @@ async function updateTaskMap(uuid, markerChangedTo) {
       case MARKERS.later:
         // If at least one sibling which has a now marker do not change parent marker,
         // otherwise only change parent marker to later when it's now.
-        if (allNowSibings.length === 0) {
+        if (allNowSiblings.length === 0) {
           updateMarker(taskMap.parent, MARKERS.later, { srcMarker: MARKERS.now });
         }
         // All children's now marker changed to later
@@ -213,7 +213,7 @@ async function updateTaskMap(uuid, markerChangedTo) {
         // change parent block to now
         updateMarker(taskMap.parent, MARKERS.now);
         // setting all now sibling block to later
-        allNowSibings.forEach((block) => {
+        allNowSiblings.forEach((block) => {
           updateMarker(block, MARKERS.later, { disableMapIterate: true });
         });
         break;
@@ -226,7 +226,7 @@ async function updateTaskMap(uuid, markerChangedTo) {
           await updateMarker(taskMap.nextSibling, MARKERS.now);
         } else if (isSiblingsAllDone) {
           updateMarker(taskMap.parent, MARKERS.done);
-        } else if (allNowSibings.length === 0) {
+        } else if (allNowSiblings.length === 0) {
           updateMarker(taskMap.parent, MARKERS.later, { srcMarker: MARKERS.now });
         }
         taskMap.children.forEach((childBlock) => {
