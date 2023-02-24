@@ -152,7 +152,7 @@ async function updateTaskMap(uuid, markerChangedTo) {
   const currentBlock = await logseq.Editor.getBlock(uuid);
   const taskMap = await getTaskMap(currentBlock);
 
-  const isSiblingsHaveNow = taskMap.siblings.find(
+  const allNowSibings = taskMap.siblings.filter(
     (task) => task.marker === MARKERS.now,
   );
   const isSiblingsAllDone = taskMap.siblings.every(
@@ -162,7 +162,7 @@ async function updateTaskMap(uuid, markerChangedTo) {
   const updateMarker = async (
     block,
     targetMarker,
-    { srcMarker, preventMarker, isCurrentBlock } = {},
+    { srcMarker, preventMarker, disableMapIterate } = {},
   ) => {
     if (block) {
       const updateBlock = async () => {
@@ -170,12 +170,14 @@ async function updateTaskMap(uuid, markerChangedTo) {
           const content = block.content.slice(block.content.indexOf(" "));
           const marker = targetMarker.toUpperCase();
           await logseq.Editor.updateBlock(block.uuid, marker + content);
+          // only iterate when updating task tree
+          disableMapIterate !== true && updateTaskMap(block.uuid, targetMarker);
         } else {
+          // updated from non-task will not iterate
           const { content } = block;
           const marker = `${targetMarker.toUpperCase()} `;
           await logseq.Editor.updateBlock(block.uuid, marker + content);
         }
-        isCurrentBlock !== true && updateTaskMap(block.uuid, targetMarker);
       };
       if (block.marker !== targetMarker) {
         // If target marker is not current block marker, then run into next step.
@@ -194,44 +196,56 @@ async function updateTaskMap(uuid, markerChangedTo) {
     }
   };
 
-  switch (markerChangedTo) {
-    case MARKERS.later:
-      // If at least one sibling which has a now marker do not change parent marker,
-      // otherwise only change parent marker to later when it's now.
-      if (!isSiblingsHaveNow) {
-        updateMarker(taskMap.parent, MARKERS.later, { srcMarker: MARKERS.now });
-      }
-      // Change current block to later.
-      updateMarker(taskMap.current, MARKERS.later, { isCurrentBlock: true });
-      // All children's now marker changed to later
-      taskMap.children.forEach((childBlock) => {
-        updateMarker(childBlock, MARKERS.later, { srcMarker: MARKERS.now });
-      });
-      break;
-    case MARKERS.now:
-      // Change parent block and current block to now
-      updateMarker(taskMap.parent, MARKERS.now);
-      updateMarker(taskMap.current, MARKERS.now, { isCurrentBlock: true });
-      break;
-    case MARKERS.done:
-      // Change current block to done.
-      updateMarker(taskMap.current, MARKERS.done, { isCurrentBlock: true });
-      if (
-        !(taskMap.nextSibling === null || taskMap.nextSibling?.marker === MARKERS.done)
-        && taskMap.parent
-      ) {
-        // If next sibling and parent both have marker, then change nextSibling marker to now
-        await updateMarker(taskMap.nextSibling, MARKERS.now);
-      } else if (isSiblingsAllDone) {
-        updateMarker(taskMap.parent, MARKERS.done);
-      } else if (!isSiblingsHaveNow) {
-        updateMarker(taskMap.parent, MARKERS.later, { srcMarker: MARKERS.now });
-      }
-      taskMap.children.forEach((childBlock) => {
-        updateMarker(childBlock, MARKERS.done);
-      });
-      break;
-    default:
+  const updateMapMethod = async (markerToChange) => {
+    switch (markerToChange) {
+      case MARKERS.later:
+        // If at least one sibling which has a now marker do not change parent marker,
+        // otherwise only change parent marker to later when it's now.
+        if (allNowSibings.length === 0) {
+          updateMarker(taskMap.parent, MARKERS.later, { srcMarker: MARKERS.now });
+        }
+        // All children's now marker changed to later
+        taskMap.children.forEach((childBlock) => {
+          updateMarker(childBlock, MARKERS.later, { srcMarker: MARKERS.now });
+        });
+        break;
+      case MARKERS.now:
+        // change parent block to now
+        updateMarker(taskMap.parent, MARKERS.now);
+        // setting all now sibling block to later
+        allNowSibings.forEach((block) => {
+          updateMarker(block, MARKERS.later, { disableMapIterate: true });
+        });
+        break;
+      case MARKERS.done:
+        if (
+          !(taskMap.nextSibling === null || taskMap.nextSibling?.marker === MARKERS.done)
+          && taskMap.parent
+        ) {
+          // If next sibling and parent both have marker, then change nextSibling marker to now
+          await updateMarker(taskMap.nextSibling, MARKERS.now);
+        } else if (isSiblingsAllDone) {
+          updateMarker(taskMap.parent, MARKERS.done);
+        } else if (allNowSibings.length === 0) {
+          updateMarker(taskMap.parent, MARKERS.later, { srcMarker: MARKERS.now });
+        }
+        taskMap.children.forEach((childBlock) => {
+          updateMarker(childBlock, MARKERS.done);
+        });
+        break;
+      default:
+    }
+  };
+
+  // when current block don't have marker, only update task map when changed marker not later
+  if (taskMap.current?.marker) {
+    updateMarker(taskMap.current, markerChangedTo, { disableMapIterate: true });
+    updateMapMethod(markerChangedTo);
+  } else {
+    markerChangedTo === MARKERS.later
+      ? updateMarker(taskMap.current, markerChangedTo, { disableMapIterate: true })
+      : updateMarker(taskMap.current, markerChangedTo, { disableMapIterate: true })
+        && updateMapMethod(markerChangedTo);
   }
 }
 
