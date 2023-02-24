@@ -353,7 +353,7 @@ const main = async () => {
       const blockParent = await logseq.Editor.getBlock(block?.parent?.id);
       if (blockParent?.marker?.toLowerCase() === MARKERS.later) {
         // only automatically start when parent task status is later and
-        // current editing block has no status, as may cause conflict when updating task map.
+        // current editing block has no status, as may cause conflict while updating task map.
         block?.marker === undefined && await updateTaskMap(blockParent.uuid, MARKERS.now);
       }
     };
@@ -385,7 +385,7 @@ const main = async () => {
 
         const block = await logseq.Editor.getCurrentBlock();
         await logseq.Editor.updateBlock(block.uuid, `${time} ${block.content}`);
-        autoStartEnabled !== false && autoStart(block);
+        autoStartEnabled === false && autoStart(block);
       },
     );
   }
