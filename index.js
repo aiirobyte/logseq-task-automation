@@ -1,28 +1,59 @@
 /* eslint-disable no-unused-expressions */
 import "@logseq/libs";
 
-let Markers;
-const CycleKeybindings = {};
-
-const settings = [
+const SETTINGS_SCHEMA = [
   {
-    key: "ToNextKeybinding",
-    title: "Change to next status.",
+    key: "to-next-keybinding",
+    title: "Next Status Cycle Shortcut",
     description:
       "Cycle among non-task, later, now, done. This keybinding is normal sequence.",
     type: "string",
     default: "mod+shift+enter",
   },
   {
-    key: "ToPrevKeybinding",
-    title: "Change to previous status.",
+    key: "to-prev-keybinding",
+    title: "Previous Status Cycle Shortcut",
     description:
-      "Cycle among non-task, later, now, done. This keybinding is reverse sequence.",
+    "Cycle among non-task, done, now, later. This keybinding is reverse sequence.",
     type: "string",
     default: "mod+shift+alt+enter",
   },
+  {
+    key: "auto-starter-enabled",
+    title: "Auto Task Starter",
+    type: "boolean",
+    description: "Enable auto parent task starter when editing child block.",
+    default: true,
+  },
+  {
+    key: "timestamp-keybinding",
+    title: "Timestamp Insert Shortcut",
+    description:
+    "Insert timestamp to block, and auto start parent task.",
+    type: "string",
+    default: "mod+t",
+  },
 ];
-logseq.useSettingsSchema(settings);
+
+let MARKERS;
+const KEYBINDINGS = {};
+
+let autoStartEnabled = true;
+
+async function updateConfig(newSettings) {
+  const { preferredWorkflow } = await logseq.App.getUserConfigs();
+  if (preferredWorkflow === "todo") {
+    MARKERS = { later: "todo", now: "doing", done: "done" };
+  } else {
+    MARKERS = { later: "later", now: "now", done: "done" };
+  }
+
+  KEYBINDINGS.toNext = newSettings["to-next-keybinding"];
+  KEYBINDINGS.toPrev = newSettings["to-prev-keybinding"];
+  KEYBINDINGS.AddTimestamp = newSettings["timestamp-keybinding"];
+
+  autoStartEnabled = newSettings["auto-starter-enabled"];
+}
 
 /**
  * Get current block task map.
@@ -121,24 +152,32 @@ async function updateTaskMap(uuid, markerChangedTo) {
   const currentBlock = await logseq.Editor.getBlock(uuid);
   const taskMap = await getTaskMap(currentBlock);
 
-  const isSiblingsHaveNow = taskMap.siblings.find(
-    (task) => task.marker === Markers.now,
+  const allNowSiblings = taskMap.siblings.filter(
+    (task) => task.marker === MARKERS.now,
   );
   const isSiblingsAllDone = taskMap.siblings.every(
-    (task) => task.marker === Markers.done,
+    (task) => task.marker === MARKERS.done,
   );
 
   const updateMarker = async (
     block,
     targetMarker,
-    { srcMarker, preventMarker, isCurrentBlock } = {},
+    { srcMarker, preventMarker, disableMapIterate } = {},
   ) => {
     if (block) {
       const updateBlock = async () => {
-        const content = block.content.slice(block.content.indexOf(" "));
-        const marker = targetMarker !== undefined ? targetMarker.toUpperCase() : `${targetMarker.toUpperCase()} `;
-        await logseq.Editor.updateBlock(block.uuid, marker + content);
-        isCurrentBlock !== true && updateTaskMap(block.uuid, targetMarker);
+        if (block?.marker) {
+          const content = block.content.slice(block.content.indexOf(" "));
+          const marker = targetMarker.toUpperCase();
+          await logseq.Editor.updateBlock(block.uuid, marker + content);
+          // only iterate when updating task tree
+          disableMapIterate !== true && updateTaskMap(block.uuid, targetMarker);
+        } else {
+          // updated from non-task will not iterate
+          const { content } = block;
+          const marker = `${targetMarker.toUpperCase()} `;
+          await logseq.Editor.updateBlock(block.uuid, marker + content);
+        }
       };
       if (block.marker !== targetMarker) {
         // If target marker is not current block marker, then run into next step.
@@ -149,97 +188,101 @@ async function updateTaskMap(uuid, markerChangedTo) {
           // If block marker is the ideal source marker, then update block.
           updateBlock();
         } else if (srcMarker === undefined && preventMarker === undefined) {
-          // If all source marker and preventMarker all not defined,
-          // just update block to target block.
+          // If all source marker and prevent marker all havn't been defined,
+          // just update block to target marker.
           updateBlock();
         }
       }
     }
   };
 
-  switch (markerChangedTo) {
-    case Markers.later:
-      // If at least one sibling which has a now marker do not change parent marker,
-      // otherwise only change parent marker to later when it's now.
-      if (!isSiblingsHaveNow) {
-        updateMarker(taskMap.parent, Markers.later, { srcMarker: Markers.now });
-      }
-      // Change current block to later.
-      updateMarker(taskMap.current, Markers.later, { isCurrentBlock: true });
-      // All children's now marker changed to later
-      taskMap.children.forEach((childBlock) => {
-        updateMarker(childBlock, Markers.later, { srcMarker: Markers.now });
-      });
-      break;
-    case Markers.now:
-      // Change parent block and current block to now
-      updateMarker(taskMap.parent, Markers.now);
-      updateMarker(taskMap.current, Markers.now, { isCurrentBlock: true });
-      break;
-    case Markers.done:
-      // Change current block to done.
-      updateMarker(taskMap.current, Markers.done, { isCurrentBlock: true });
-      if (
-        !(taskMap.nextSibling === null || taskMap.nextSibling?.marker === Markers.done)
-        && taskMap.parent
-      ) {
-        // If next sibling and parent both have marker, then change nextSibling marker to now
-        await updateMarker(taskMap.nextSibling, Markers.now);
-      } else if (isSiblingsAllDone) {
-        updateMarker(taskMap.parent, Markers.done);
-      } else if (!isSiblingsHaveNow) {
-        updateMarker(taskMap.parent, Markers.later, { srcMarker: Markers.now });
-      }
-      taskMap.children.forEach((childBlock) => {
-        updateMarker(childBlock, Markers.done);
-      });
-      break;
-    default:
+  const updateMapMethod = async (markerToChange) => {
+    switch (markerToChange) {
+      case MARKERS.later:
+        // If at least one sibling which has a now marker do not change parent marker,
+        // otherwise only change parent marker to later when it's now.
+        if (allNowSiblings.length === 0) {
+          updateMarker(taskMap.parent, MARKERS.later, { srcMarker: MARKERS.now });
+        }
+        // All children's now marker changed to later
+        taskMap.children.forEach((childBlock) => {
+          updateMarker(childBlock, MARKERS.later, { srcMarker: MARKERS.now });
+        });
+        break;
+      case MARKERS.now:
+        // change parent block to now
+        updateMarker(taskMap.parent, MARKERS.now);
+        // setting all now sibling block to later
+        allNowSiblings.forEach((block) => {
+          updateMarker(block, MARKERS.later, { disableMapIterate: true });
+        });
+        break;
+      case MARKERS.done:
+        if (
+          !(taskMap.nextSibling === null || taskMap.nextSibling?.marker === MARKERS.done)
+          && taskMap.parent
+        ) {
+          // If next sibling and parent both have marker, then change nextSibling marker to now
+          await updateMarker(taskMap.nextSibling, MARKERS.now);
+        } else if (isSiblingsAllDone) {
+          updateMarker(taskMap.parent, MARKERS.done);
+        } else if (allNowSiblings.length === 0) {
+          updateMarker(taskMap.parent, MARKERS.later, { srcMarker: MARKERS.now });
+        }
+        taskMap.children.forEach((childBlock) => {
+          updateMarker(childBlock, MARKERS.done);
+        });
+        break;
+      default:
+    }
+  };
+
+  // when current block don't have marker, only update task map when changed marker not later
+  if (taskMap.current?.marker) {
+    updateMarker(taskMap.current, markerChangedTo, { disableMapIterate: true });
+    updateMapMethod(markerChangedTo);
+  } else {
+    markerChangedTo === MARKERS.later
+      ? updateMarker(taskMap.current, markerChangedTo, { disableMapIterate: true })
+      : updateMarker(taskMap.current, markerChangedTo, { disableMapIterate: true })
+        && updateMapMethod(markerChangedTo);
   }
 }
 
 const main = async () => {
+  logseq.useSettingsSchema(SETTINGS_SCHEMA);
+  await updateConfig(logseq.settings);
+  logseq.onSettingsChanged(updateConfig);
+
   // eslint-disable-next-line no-console
   console.log("Init task automation service.");
   const mainContainer = top.document.querySelector("#main-content-container");
 
-  const updateConfig = async () => {
-    const { preferredWorkflow } = await logseq.App.getUserConfigs();
-    if (preferredWorkflow === "todo") {
-      Markers = { later: "todo", now: "doing", done: "done" };
-    } else {
-      Markers = { later: "later", now: "now", done: "done" };
-    }
-
-    CycleKeybindings.ToNext = logseq.settings.ToNextKeybinding;
-    CycleKeybindings.ToPrev = logseq.settings.ToPrevKeybinding;
-  };
-
   // regist cycling shortcuts
-  function shortcutRegister() {
+  function CycleShortcutsRegister() {
     logseq.App.registerCommandPalette(
       {
         key: "task-automation-shortcuts-to-next",
         label: "Cycle in normal sequence",
         keybinding: {
           mode: "global",
-          binding: CycleKeybindings.ToNext,
+          binding: KEYBINDINGS.toNext,
         },
       },
       async () => {
         const block = await logseq.Editor.getCurrentBlock();
         switch (block?.marker?.toLowerCase()) {
-          case Markers.later:
+          case MARKERS.later:
             // If block's marker is later, change it to now.
-            updateTaskMap(block.uuid, Markers.now);
+            updateTaskMap(block.uuid, MARKERS.now);
             break;
-          case Markers.now:
+          case MARKERS.now:
             // If block's marker is now, change it to done.
-            updateTaskMap(block.uuid, Markers.done);
+            updateTaskMap(block.uuid, MARKERS.done);
             break;
-          case Markers.done:
+          case MARKERS.done:
             // If block's marker is done, change it to later.
-            updateTaskMap(block.uuid, Markers.later);
+            updateTaskMap(block.uuid, MARKERS.later);
             break;
           // case undefined:
           //   // If block's marker is nonMarker, change it to later.
@@ -247,7 +290,7 @@ const main = async () => {
           //   break;
           default:
             // If block's marker is not later, now, done, just change it to later.
-            updateTaskMap(block.uuid, Markers.later);
+            updateTaskMap(block.uuid, MARKERS.later);
         }
       },
     );
@@ -257,23 +300,23 @@ const main = async () => {
         label: "Cycle in reverse sequence",
         keybinding: {
           mode: "global",
-          binding: CycleKeybindings.ToPrev,
+          binding: KEYBINDINGS.toPrev,
         },
       },
       async () => {
         const block = await logseq.Editor.getCurrentBlock();
         switch (block?.marker?.toLowerCase()) {
-          case Markers.later:
+          case MARKERS.later:
             // If block's marker is later, change it to done.
-            updateTaskMap(block.uuid, Markers.done);
+            updateTaskMap(block.uuid, MARKERS.done);
             break;
-          case Markers.now:
+          case MARKERS.now:
             // If block's marker is now, change it to later.
-            updateTaskMap(block.uuid, Markers.later);
+            updateTaskMap(block.uuid, MARKERS.later);
             break;
-          case Markers.done:
+          case MARKERS.done:
             // If block's marker is done, change it to now.
-            updateTaskMap(block.uuid, Markers.now);
+            updateTaskMap(block.uuid, MARKERS.now);
             break;
           // case undefined:
           //   // If block's marker is nonMarker, change it to done.
@@ -281,7 +324,7 @@ const main = async () => {
           //   break;
           default:
             // If block's marker is not later, now, done, just change it to done.
-            updateTaskMap(block.uuid, Markers.done);
+            updateTaskMap(block.uuid, MARKERS.done);
         }
       },
     );
@@ -296,21 +339,21 @@ const main = async () => {
       const targetBlockUuid = e.path[4]?.getAttribute("blockid");
 
       if (targetBlockUuid) {
-        Object.keys(Markers).forEach((key) => {
-          if (targetParentClassName === `inline ${Markers[key]}`) {
+        Object.keys(MARKERS).forEach((key) => {
+          if (targetParentClassName === `inline ${MARKERS[key]}`) {
             if (targetElement.tagName === "A") {
               // Later and now target elements have "a" tag name
               // The changes match their parent class name
-              updateTaskMap(targetBlockUuid, Markers[key]);
-            } else if (targetParentClassName !== `inline ${Markers.done}`) {
+              updateTaskMap(targetBlockUuid, MARKERS[key]);
+            } else if (targetParentClassName !== `inline ${MARKERS.done}`) {
               // Done click box has another tag name
               // The changes don't match their parent class name
               // The class name can be later or now
-              updateTaskMap(targetBlockUuid, Markers.done);
+              updateTaskMap(targetBlockUuid, MARKERS.done);
             } else {
               // When class name is not inline done,
               // this means user clicks the checkbox and set marker to later
-              updateTaskMap(targetBlockUuid, Markers.later);
+              updateTaskMap(targetBlockUuid, MARKERS.later);
             }
           }
         });
@@ -318,20 +361,60 @@ const main = async () => {
     });
   }
 
-  // get config when startup, then on setting changed update config
-  await updateConfig();
-  logseq.onSettingsChanged(async () => {
-    await updateConfig();
-  });
+  // task start function triggered by editing child block or using timestamp
+  function taskStarter() {
+    const autoStart = async (block) => {
+      const blockParent = await logseq.Editor.getBlock(block?.parent?.id);
+      if (blockParent?.marker?.toLowerCase() === MARKERS.later) {
+        // only automatically start when parent task status is later and
+        // current editing block has no status, as may cause conflict while updating task map.
+        block?.marker === undefined && await updateTaskMap(blockParent.uuid, MARKERS.now);
+      }
+    };
 
-  // Start listener on startup then on routeChanged restart listener
+    // Add auto task starter listener, if user enables it.
+    if (autoStartEnabled) {
+      logseq.DB.onChanged(({ blocks, txData }) => {
+        // only listen content changing
+        if (txData.find((t) => t[1] === "content")) {
+          const changedBlocks = blocks;
+          changedBlocks.forEach(async (block) => {
+            autoStart(block);
+          });
+        }
+      });
+    }
+
+    // timestamp shortcut register
+    logseq.App.registerCommandPalette(
+      {
+        key: "task-automation-shortcuts-add-timestamp",
+        label: "Add timestamp to block",
+        keybinding: {
+          mode: "global",
+          binding: KEYBINDINGS.AddTimestamp,
+        },
+      },
+      async () => {
+        // get time
+        const today = new Date();
+        const time = `${String(today.getHours()).padStart(2, "0")}:${String(today.getMinutes()).padStart(2, "0")}`;
+
+        const block = await logseq.Editor.getCurrentBlock();
+        await logseq.Editor.updateBlock(block.uuid, `${time} ${block.content}`);
+        autoStartEnabled === false && autoStart(block);
+      },
+    );
+  }
+
+  // Start functions
   addTaskClickListner();
   logseq.App.onRouteChanged(() => {
     mainContainer.removeEventListener();
     addTaskClickListner();
   });
-  // Start shortcut register on startup
-  shortcutRegister();
+  CycleShortcutsRegister();
+  taskStarter();
 };
 
 // eslint-disable-next-line no-console
