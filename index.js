@@ -374,11 +374,14 @@ const main = async () => {
 
     // Add auto task starter listener, if user enables it.
     if (autoStartEnabled) {
-      logseq.DB.onChanged((e) => {
-        const changedBlocks = e.blocks;
-        changedBlocks.forEach(async (block) => {
-          autoStart(block);
-        });
+      logseq.DB.onChanged(({ blocks, txData }) => {
+        // only listen content changing
+        if (txData.find((t) => t[1] === "content")) {
+          const changedBlocks = blocks;
+          changedBlocks.forEach(async (block) => {
+            autoStart(block);
+          });
+        }
       });
     }
 
