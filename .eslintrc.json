@@ -3,25 +3,31 @@
     "browser": true,
     "es2021": true
   },
-  "extends": ["eslint:recommended", "airbnb"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
+  ],
   "overrides": [],
+  "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module"
   },
   "rules": {
-    "no-console": [
-      "warn",
-      {
-        "allow": ["no-console"]
-      }
-    ],
-    "no-await-in-loop": "off",
-    "no-restricted-globals": [1, "parent"],
-    "linebreak-style": ["error", "windows"],
-    "quotes": ["error", "double"]
+    "no-duplicate-imports": "error",
+    "quotes": ["error", "single"]
   },
   "globals": {
     "logseq": "readonly"
+  },
+  "plugins": [
+    "@typescript-eslint",
+    "prettier"
+  ],
+  "settings": {
+    "import/resolver": {
+      "typescript": {}
+        }
   }
 }
