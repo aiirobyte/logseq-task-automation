@@ -5,7 +5,7 @@
   "description": "A plugin that simplifies the process of initiating and completing tasks on Logseq.",
   "logseq": {
     "title": "Task Automation",
-    "icon": "./icon.png",
+    "icon": "./public/icon.png",
     "id": "logseq-task-automation"
   },
   "main": "dist/index.html",
@@ -17,20 +17,26 @@
   "author": "aiirobyte",
   "license": "MIT",
   "scripts": {
-    "lint": "npx eslint index.js",
-    "build": "parcel build --no-source-maps index.html --public-url ./"
+    "lint": "eslint src/*.ts",
+    "lint:fix": "eslint --fix src/*.ts",
+    "format": "prettier --write src/*.ts --config ./.prettierrc",
+    "build": "parcel build --no-source-maps ./public/index.html --public-url ./",
+    "watch": "parcel watch --no-source-maps ./public/index.html --public-url ./",
+    "clean": "rimraf dist"
   },
   "dependencies": {
-    "@logseq/libs": "^0.0.14"
+    "@logseq/libs": "^0.0.14",
+    "rimraf": "^4.4.0"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.54.1",
+    "@typescript-eslint/parser": "^5.54.1",
     "eslint": "^8.0.1",
-    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-prettier": "^8.7.0",
     "eslint-plugin-import": "^2.25.2",
-    "eslint-plugin-jsx-a11y": "^6.7.1",
-    "eslint-plugin-n": "^15.0.0",
-    "eslint-plugin-promise": "^6.0.0",
-    "eslint-plugin-react": "^7.32.1",
-    "parcel": "^2.0.0"
+    "eslint-plugin-prettier": "^4.2.1",
+    "parcel": "^2.0.0",
+    "prettier": "^2.8.4",
+    "typescript": "^4.9.5"
   }
 }
