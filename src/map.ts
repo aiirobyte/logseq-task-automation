@@ -41,7 +41,7 @@ async function getTaskMap(block: BlockEntity): Promise<TaskMap> {
   };
 
   // Add all children with marker
-  taskMap.children =
+  let children =
     blockWithChildren?.children
       ?.filter((child) => 'marker' in child) // filter out BlockUUIDTuple
       .map((child) => ({
@@ -51,47 +51,55 @@ async function getTaskMap(block: BlockEntity): Promise<TaskMap> {
         marker: (<BlockEntity>child).marker,
         content: (<BlockEntity>child).content,
       })) ?? []; // use empty array if null or undefined
+  if (children.length > 0) taskMap.children = children;
 
   // Add parent with marker
   const parentBlock = await logseq.Editor.getBlock(block.parent.id);
-  taskMap.parent = parentBlock?.marker
-    ? {
-        id: parentBlock.id,
-        uuid: parentBlock.uuid,
-        marker: parentBlock.marker,
-        content: parentBlock.content,
-      }
-    : undefined;
+  if (parentBlock?.marker) {
+    taskMap.parent = {
+      id: parentBlock.id,
+      uuid: parentBlock.uuid,
+      marker: parentBlock.marker,
+      content: parentBlock.content,
+    }
+  };
 
   // Add all siblings with marker
   let previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(blockUuid);
-  while (previousSiblingBlock) {
-    previousSiblingBlock?.marker &&
-      (taskMap.siblings ?? []).unshift({
-        id: previousSiblingBlock.id,
-        uuid: previousSiblingBlock.uuid,
-        marker: previousSiblingBlock.marker,
-        content: previousSiblingBlock.content,
-      });
-    previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(previousSiblingBlock.uuid);
+  if (previousSiblingBlock) {
+    taskMap.siblings = []
+    while (previousSiblingBlock) {
+      previousSiblingBlock?.marker &&
+        (taskMap.siblings).unshift({
+          id: previousSiblingBlock.id,
+          uuid: previousSiblingBlock.uuid,
+          marker: previousSiblingBlock.marker,
+          content: previousSiblingBlock.content,
+        });
+      previousSiblingBlock = await logseq.Editor.getPreviousSiblingBlock(previousSiblingBlock.uuid);
+    }
   }
+
   let nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(blockUuid);
-  nextSiblingBlock?.marker &&
-    (taskMap.nextSibling = {
-      id: nextSiblingBlock.id,
-      uuid: nextSiblingBlock.uuid,
-      marker: nextSiblingBlock.marker.toLowerCase(),
-      content: nextSiblingBlock.content,
-    });
-  while (nextSiblingBlock) {
+  if (nextSiblingBlock) {
+    if (taskMap?.siblings === undefined) taskMap.siblings = [];
     nextSiblingBlock?.marker &&
-      (taskMap.siblings ?? []).push({
+      (taskMap.nextSibling = {
         id: nextSiblingBlock.id,
         uuid: nextSiblingBlock.uuid,
-        marker: nextSiblingBlock.marker.toLowerCase(),
+        marker: nextSiblingBlock.marker,
         content: nextSiblingBlock.content,
       });
-    nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(nextSiblingBlock.uuid);
+    while (nextSiblingBlock) {
+      nextSiblingBlock?.marker &&
+        (taskMap.siblings).push({
+          id: nextSiblingBlock.id,
+          uuid: nextSiblingBlock.uuid,
+          marker: nextSiblingBlock.marker,
+          content: nextSiblingBlock.content,
+        });
+      nextSiblingBlock = await logseq.Editor.getNextSiblingBlock(nextSiblingBlock.uuid);
+    }
   }
 
   return taskMap;
@@ -106,6 +114,7 @@ async function getTaskMap(block: BlockEntity): Promise<TaskMap> {
 export async function updateTaskMap(uuid: BlockUUID, markerChangedTo: string, markers: Markers) {
   const currentBlock = (await logseq.Editor.getBlock(uuid)) as BlockEntity;
   const taskMap = await getTaskMap(currentBlock);
+  console.log(taskMap);
 
   const allNowSiblings = taskMap?.siblings?.filter((task) => task.marker === markers.now) ?? [];
   const isSiblingsAllDone = taskMap?.siblings?.every((task) => task.marker === markers.done);
@@ -123,14 +132,14 @@ export async function updateTaskMap(uuid: BlockUUID, markerChangedTo: string, ma
       const updateBlock = async () => {
         if (block?.marker) {
           const content = block.content.slice(block.content.indexOf(' '));
-          const marker = targetMarker.toUpperCase();
+          const marker = targetMarker;
           await logseq.Editor.updateBlock(block.uuid, marker + content);
           // only iterate when updating task tree
           disableMapIterate !== true && updateTaskMap(block.uuid, targetMarker, markers);
         } else {
           // updated from non-task will not iterate
           const { content } = block;
-          const marker = `${targetMarker.toUpperCase()} `;
+          const marker = `${targetMarker} `;
           await logseq.Editor.updateBlock(block.uuid, marker + content);
         }
       };

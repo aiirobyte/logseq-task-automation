@@ -46,7 +46,7 @@ function cycleShortcutsRegister(keybindings: Keybindings, markers: Markers) {
     },
     async () => {
       const block = await logseq.Editor.getCurrentBlock();
-      switch (block?.marker?.toLowerCase()) {
+      switch (block?.marker) {
         case markers.later:
           // If block's marker is later, change it to done.
           updateTaskMap(block.uuid, markers.done, markers);
@@ -126,7 +126,6 @@ function addTaskClickListner(markers: Markers) {
 
   // click event listener for inline marker
   const handleClick = (e: Event) => {
-    console.log(e);
     const targetElement = e.target as HTMLElement;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const targetParentClassName = (e as any).path[1].className;
